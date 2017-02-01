@@ -4,14 +4,37 @@
 #define SCE_NETCHECK_DIALOG_MODE_PSN 2
 #define SCE_NETCHECK_DIALOG_MODE_PSN_ONLINE 3
 
+#define SCE_COMMON_DIALOG_ERROR_NOT_IN_USE 0x80020411
+#define SCE_COMMON_DIALOG_STATUS_NONE 0
+#define SCE_COMMON_DIALOG_STATUS_FINISHED 2
+
+typedef struct SceCommonDialogParam {
+  void *infobarParam;
+  void *bgColor;
+  void *dimmerColor;
+  char reserved[60];
+  int magic;
+} SceCommonDialogParam;
+
+typedef struct SceNetCheckDialogAgeRestriction {
+  char countryCode[2];
+  char age;
+  char padding;
+} SceNetCheckDialogAgeRestriction;
+
 typedef struct SceNetCheckDialogParam {
-    int sdkVersion;
-    void *commonParam[3];
-    int mode;
-    int npCommunicationId;
-    void *ps3ConnectParam;
-    void *groupName;
-    char reserved[192];
+  int sdkVersion;
+  SceCommonDialogParam commonParam;
+  int mode;
+  int npCommunicationId;
+  int *ps3ConnectParam;
+  void *groupName;
+  int timeoutUs;
+  char defaultAgeRestriction;
+  char padding[3];
+  int ageRestrictionCount;
+  const SceNetCheckDialogAgeRestriction *ageRestriction;
+  char reserved[104];
 } SceNetCheckDialogParam;
 
 static SceUID g_hooks[6];
@@ -42,7 +65,7 @@ static tai_hook_ref_t g_sceNetCheckDialogAbort_hook;
 static int sceNetCheckDialogAbort_patched(void) {
   int ret;
   ret = TAI_CONTINUE(int, g_sceNetCheckDialogAbort_hook);
-  if (ret < 0) {
+  if (ret == SCE_COMMON_DIALOG_ERROR_NOT_IN_USE) {
     ret = 0;
   }
   return ret;
@@ -52,7 +75,7 @@ static tai_hook_ref_t g_sceNetCheckDialogGetResult_hook;
 static int sceNetCheckDialogGetResult_patched(void *result) {
   int ret;
   ret = TAI_CONTINUE(int, g_sceNetCheckDialogGetResult_hook, result);
-  if (ret < 0) {
+  if (ret == SCE_COMMON_DIALOG_ERROR_NOT_IN_USE) {
     ret = 0;
   }
   return ret;
@@ -62,8 +85,8 @@ static tai_hook_ref_t g_sceNetCheckDialogGetStatus_hook;
 static int sceNetCheckDialogGetStatus_patched(void) {
   int ret;
   ret = TAI_CONTINUE(int, g_sceNetCheckDialogGetStatus_hook);
-  if (ret < 0) {
-    ret = 2; // finished
+  if (ret == SCE_COMMON_DIALOG_ERROR_NOT_IN_USE || ret == SCE_COMMON_DIALOG_STATUS_NONE) {
+    ret = SCE_COMMON_DIALOG_STATUS_FINISHED;
   }
   return ret;
 }
@@ -72,7 +95,7 @@ static tai_hook_ref_t g_sceNetCheckDialogTerm_hook;
 static int sceNetCheckDialogTerm_patched(void) {
   int ret;
   ret = TAI_CONTINUE(int, g_sceNetCheckDialogTerm_hook);
-  if (ret < 0) {
+  if (ret == SCE_COMMON_DIALOG_ERROR_NOT_IN_USE) {
     ret = 0;
   }
   return ret;
